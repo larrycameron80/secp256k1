@@ -23,7 +23,9 @@ typedef struct {
      * None of the resulting prec group elements have a known scalar, and neither do any of
      * the intermediate sums while computing a*G.
      */
+#ifndef USE_ECMULT_NO_PRECOMPUTATION
     secp256k1_ge_storage (*prec)[64][16]; /* prec[j][i] = 16^j * i * G + U_i */
+#endif 
     secp256k1_scalar blind;
     secp256k1_gej initial;
 } secp256k1_ecmult_gen_context;
