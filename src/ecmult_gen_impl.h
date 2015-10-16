@@ -11,31 +11,40 @@
 #include "group.h"
 #include "ecmult_gen.h"
 #include "hash_impl.h"
+
 #ifdef USE_ECMULT_STATIC_PRECOMPUTATION
 #include "ecmult_static_context.h"
+#ifdef USE_ECMULT_NO_PRECOMPUTATION
+#error "Define only one of USE_ECMULT_STATIC_PRECOMPUTATION or USE_ECMULT_NO_PRECOMPUTATION."
 #endif
+#endif
+
+
 static void secp256k1_ecmult_gen_context_init(secp256k1_ecmult_gen_context *ctx) {
+#ifndef USE_ECMULT_NO_PRECOMPUTATION
     ctx->prec = NULL;
+#else
+    secp256k1_scalar_clear(&ctx->blind);
+#endif
 }
 
 static void secp256k1_ecmult_gen_context_build(secp256k1_ecmult_gen_context *ctx, const secp256k1_callback* cb) {
+#ifndef USE_ECMULT_NO_PRECOMPUTATION
+    if (ctx->prec != NULL) {
+        return;
+    }
 #ifndef USE_ECMULT_STATIC_PRECOMPUTATION
     secp256k1_ge prec[1024];
     secp256k1_gej gj;
     secp256k1_gej nums_gej;
     int i, j;
-#endif
-
-    if (ctx->prec != NULL) {
-        return;
-    }
-#ifndef USE_ECMULT_STATIC_PRECOMPUTATION
+    
     ctx->prec = (secp256k1_ge_storage (*)[64][16])checked_malloc(cb, sizeof(*ctx->prec));
 
     /* get the generator */
     secp256k1_gej_set_ge(&gj, &secp256k1_ge_const_g);
 
-    /* Construct a group element with no known corresponding scalar (nothing up my sleeve). */
+    /* construct a group element with no known corresponding scalar (nothing up my sleeve). */
     {
         static const unsigned char nums_b32[33] = "The scalar for this x is unknown";
         secp256k1_fe nums_x;
@@ -79,6 +88,7 @@ static void secp256k1_ecmult_gen_context_build(secp256k1_ecmult_gen_context *ctx
         }
         secp256k1_ge_set_all_gej_var(1024, prec, precj, cb);
     }
+    
     for (j = 0; j < 64; j++) {
         for (i = 0; i < 16; i++) {
             secp256k1_ge_to_storage(&(*ctx->prec)[j][i], &prec[j*16 + i]);
@@ -88,50 +98,76 @@ static void secp256k1_ecmult_gen_context_build(secp256k1_ecmult_gen_context *ctx
     (void)cb;
     ctx->prec = (secp256k1_ge_storage (*)[64][16])secp256k1_ecmult_static_context;
 #endif
+#else 
+    (void)ctx;
+    (void)cb;
+#endif
     secp256k1_ecmult_gen_blind(ctx, NULL);
 }
 
 static int secp256k1_ecmult_gen_context_is_built(const secp256k1_ecmult_gen_context* ctx) {
+#ifdef USE_ECMULT_NO_PRECOMPUTATION
+    (void)ctx; 
+    return 1;
+#else
     return ctx->prec != NULL;
+#endif
 }
 
 static void secp256k1_ecmult_gen_context_clone(secp256k1_ecmult_gen_context *dst,
                                                const secp256k1_ecmult_gen_context *src, const secp256k1_callback* cb) {
+#ifdef USE_ECMULT_NO_PRECOMPUTATION
+    (void)cb;
+    if (!secp256k1_scalar_is_zero(&src->blind)) {
+        dst->initial = src->initial;
+        dst->blind = src->blind;
+    }
+#else
     if (src->prec == NULL) {
         dst->prec = NULL;
     } else {
-#ifndef USE_ECMULT_STATIC_PRECOMPUTATION
-        dst->prec = (secp256k1_ge_storage (*)[64][16])checked_malloc(cb, sizeof(*dst->prec));
-        memcpy(dst->prec, src->prec, sizeof(*dst->prec));
-#else
+#ifdef USE_ECMULT_STATIC_PRECOMPUTATION
         (void)cb;
         dst->prec = src->prec;
+#else
+        dst->prec = (secp256k1_ge_storage (*)[64][16])checked_malloc(cb, sizeof(*dst->prec));
+        memcpy(dst->prec, src->prec, sizeof(*dst->prec));
 #endif
         dst->initial = src->initial;
         dst->blind = src->blind;
     }
+#endif
 }
 
 static void secp256k1_ecmult_gen_context_clear(secp256k1_ecmult_gen_context *ctx) {
+#ifndef USE_ECMULT_NO_PRECOMPUTATION
 #ifndef USE_ECMULT_STATIC_PRECOMPUTATION
     free(ctx->prec);
 #endif
+    ctx->prec = NULL;
+#endif
     secp256k1_scalar_clear(&ctx->blind);
     secp256k1_gej_clear(&ctx->initial);
-    ctx->prec = NULL;
 }
 
 static void secp256k1_ecmult_gen(const secp256k1_ecmult_gen_context *ctx, secp256k1_gej *r, const secp256k1_scalar *gn) {
     secp256k1_ge add;
-    secp256k1_ge_storage adds;
     secp256k1_scalar gnb;
-    int bits;
-    int i, j;
-    memset(&adds, 0, sizeof(adds));
     *r = ctx->initial;
     /* Blind scalar/point multiplication by computing (n-b)G + bG instead of nG. */
     secp256k1_scalar_add(&gnb, gn, &ctx->blind);
     add.infinity = 0;
+#ifdef USE_ECMULT_NO_PRECOMPUTATION
+    (void)ctx;
+    secp256k1_gej add_j;
+    secp256k1_ecmult_const(&add_j, &secp256k1_ge_const_g, &gnb); // (n-b)G
+    secp256k1_ge_set_gej(&add, &add_j);
+    secp256k1_gej_add_ge(r, r, &add); // (n-b)G + bG
+#else
+    secp256k1_ge_storage adds;
+    memset(&adds, 0, sizeof(adds));
+    int bits;
+    int i, j;
     for (j = 0; j < 64; j++) {
         bits = secp256k1_scalar_get_bits(&gnb, j * 4, 4);
         for (i = 0; i < 16; i++) {
@@ -151,6 +187,7 @@ static void secp256k1_ecmult_gen(const secp256k1_ecmult_gen_context *ctx, secp25
         secp256k1_gej_add_ge(r, r, &add);
     }
     bits = 0;
+#endif
     secp256k1_ge_clear(&add);
     secp256k1_scalar_clear(&gnb);
 }
@@ -201,8 +238,15 @@ static void secp256k1_ecmult_gen_blind(secp256k1_ecmult_gen_context *ctx, const 
     memset(nonce32, 0, 32);
     secp256k1_ecmult_gen(ctx, &gb, &b);
     secp256k1_scalar_negate(&b, &b);
+<<<<<<< 30bcc82275563d6036364476a2037069c2bd0643
     memcpy(&ctx->blind, &b, sizeof(ctx->blind));
     memcpy(&ctx->initial, &gb, sizeof(ctx->initial));
+=======
+    //ctx->blind = b;
+    //ctx->initial = gb;
+    memcpy(&ctx->blind, &b, sizeof(ctx->blind));
+    memcpy(&ctx->initial, &gb, sizeof(ctx->initial)); 
+>>>>>>> use ecmult_const for low memory secp signing
     secp256k1_scalar_clear(&b);
     secp256k1_gej_clear(&gb);
 }
