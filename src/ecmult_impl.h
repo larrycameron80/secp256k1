@@ -266,7 +266,25 @@ static int secp256k1_ecmult_wnaf(int *wnaf, int len, const secp256k1_scalar *a, 
     return last_set_bit + 1;
 }
 
+#include "ecmult_const.h"////////////////////////
 static void secp256k1_ecmult(const secp256k1_ecmult_context *ctx, secp256k1_gej *r, const secp256k1_gej *a, const secp256k1_scalar *na, const secp256k1_scalar *ng) {
+    ////////////////////////////////////////////////////
+    { 
+        (void)ctx;
+        secp256k1_gej r1_j, r2_j;
+        secp256k1_gej A = *a;
+        secp256k1_ge G = secp256k1_ge_const_g;
+        secp256k1_ge pubkey;
+        secp256k1_ge_set_gej(&pubkey, &A);
+        secp256k1_ecmult_const(&r1_j, &pubkey, na);
+        secp256k1_ecmult_const(&r2_j, &G, ng);
+        secp256k1_gej_add_var(r, &r1_j, &r2_j, NULL);
+    }
+    return;
+    ////////////////////////////////////////////////////
+    
+    
+    
     secp256k1_ge pre_a[ECMULT_TABLE_SIZE(WINDOW_A)];
     secp256k1_ge tmpa;
     secp256k1_fe Z;
