@@ -266,25 +266,35 @@ static int secp256k1_ecmult_wnaf(int *wnaf, int len, const secp256k1_scalar *a, 
     return last_set_bit + 1;
 }
 
-#include "ecmult_const.h"////////////////////////
+#include "ecmult_const.h"/* !!! */
 static void secp256k1_ecmult(const secp256k1_ecmult_context *ctx, secp256k1_gej *r, const secp256k1_gej *a, const secp256k1_scalar *na, const secp256k1_scalar *ng) {
-    ////////////////////////////////////////////////////
-    { 
-        (void)ctx;
-        secp256k1_gej r1_j, r2_j;
-        secp256k1_gej A = *a;
-        secp256k1_ge G = secp256k1_ge_const_g;
-        secp256k1_ge pubkey;
-        secp256k1_ge_set_gej(&pubkey, &A);
-        secp256k1_ecmult_const(&r1_j, &pubkey, na);
-        secp256k1_ecmult_const(&r2_j, &G, ng);
-        secp256k1_gej_add_var(r, &r1_j, &r2_j, NULL);
-    }
+    
+#if 0 
+    
+    /*  !!!  */
+    
+    secp256k1_gej r1_j, r2_j;
+    secp256k1_gej A;
+    secp256k1_ge pubkey;
+    secp256k1_ge G;
+    
+    G = secp256k1_ge_const_g;
+    A = *a;
+    
+    secp256k1_ge_set_gej(&pubkey, &A);
+    secp256k1_ecmult_const(&r1_j, &pubkey, na);
+    secp256k1_ecmult_const(&r2_j, &G, ng);
+    secp256k1_gej_add_var(r, &r1_j, &r2_j, NULL);
+    (void)ctx;
     return;
-    ////////////////////////////////////////////////////
     
-    
-    
+    /*  !!!  */
+
+
+#else
+   
+
+
     secp256k1_ge pre_a[ECMULT_TABLE_SIZE(WINDOW_A)];
     secp256k1_ge tmpa;
     secp256k1_fe Z;
@@ -402,6 +412,7 @@ static void secp256k1_ecmult(const secp256k1_ecmult_context *ctx, secp256k1_gej 
     if (!r->infinity) {
         secp256k1_fe_mul(&r->z, &r->z, &Z);
     }
+#endif
 }
 
 #endif

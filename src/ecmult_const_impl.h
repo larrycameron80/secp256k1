@@ -126,7 +126,6 @@ static void secp256k1_ecmult_const(secp256k1_gej *r, const secp256k1_ge *a, cons
     secp256k1_ge pre_a[ECMULT_TABLE_SIZE(WINDOW_A)];
     secp256k1_ge tmpa;
     secp256k1_fe Z;
-
 #ifdef USE_ENDOMORPHISM
     secp256k1_ge pre_a_lam[ECMULT_TABLE_SIZE(WINDOW_A)];
     int wnaf_1[1 + WNAF_SIZE(WINDOW_A - 1)];
