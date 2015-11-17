@@ -15,10 +15,11 @@ void test_ecdh_generator_basepoint(void) {
     s_one[31] = 1;
     /* Check against pubkey creation when the basepoint is the generator */
     for (i = 0; i < 100; ++i) {
-        secp256k1_sha256_t sha;
+        //secp256k1_sha256_t sha;
         unsigned char s_b32[32];
-        unsigned char output_ecdh[32];
-        unsigned char output_ser[32];
+        unsigned char output_ecdh[33];
+        //unsigned char output_ecdh[32];
+        //unsigned char output_ser[32];
         unsigned char point_ser[33];
         size_t point_ser_len = sizeof(point_ser);
         secp256k1_scalar s;
@@ -33,11 +34,18 @@ void test_ecdh_generator_basepoint(void) {
         CHECK(secp256k1_ec_pubkey_create(ctx, &point[1], s_b32) == 1);
         CHECK(secp256k1_ec_pubkey_serialize(ctx, point_ser, &point_ser_len, &point[1], SECP256K1_EC_COMPRESSED) == 1);
         CHECK(point_ser_len == sizeof(point_ser));
-        secp256k1_sha256_initialize(&sha);
-        secp256k1_sha256_write(&sha, point_ser, point_ser_len);
-        secp256k1_sha256_finalize(&sha, output_ser);
+         /*
+        // NodeJS Crypto ECDH (2FA smartphone pairing) uses the x coordinate
+        // intead of the compressed key as the shared secret. So do not SHA
+        // hash here, return the compressed key, and decide how to hash in the
+        // calling code.
+        //secp256k1_sha256_initialize(&sha);
+        //secp256k1_sha256_write(&sha, point_ser, point_ser_len);
+        //secp256k1_sha256_finalize(&sha, output_ser);
+        */ 
         /* compare */
-        CHECK(memcmp(output_ecdh, output_ser, sizeof(output_ser)) == 0);
+        //CHECK(memcmp(output_ecdh, output_ser, sizeof(output_ser)) == 0);
+        CHECK(memcmp(output_ecdh, point_ser, sizeof(point_ser)) == 0);
     }
 }
 

@@ -28,7 +28,7 @@ int secp256k1_ecdh(const secp256k1_context* ctx, unsigned char *result, const se
     } else {
         unsigned char x[32];
         unsigned char y[1];
-        secp256k1_sha256_t sha;
+        //secp256k1_sha256_t sha;
 
         secp256k1_ecmult_const(&res, &pt, &s);
         secp256k1_ge_set_gej(&pt, &res);
@@ -39,11 +39,18 @@ int secp256k1_ecdh(const secp256k1_context* ctx, unsigned char *result, const se
         secp256k1_fe_normalize(&pt.y);
         secp256k1_fe_get_b32(x, &pt.x);
         y[0] = 0x02 | secp256k1_fe_is_odd(&pt.y);
-
+        /*
+        // NodeJS Crypto ECDH (2FA smartphone pairing) uses the x coordinate
+        // intead of the compressed key as the shared secret. So do not SHA
+        // hash here, return the compressed key, and decide how to hash in the
+        // calling code.
         secp256k1_sha256_initialize(&sha);
         secp256k1_sha256_write(&sha, y, sizeof(y));
         secp256k1_sha256_write(&sha, x, sizeof(x));
         secp256k1_sha256_finalize(&sha, result);
+        */
+        memcpy(result, y, sizeof(y));
+        memcpy(result + sizeof(y), x, sizeof(x));
         ret = 1;
     }
 
